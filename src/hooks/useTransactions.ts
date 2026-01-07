@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Transaction, MonthlyStats } from '@/types';
 
 const STORAGE_KEY = 'household_budget_data';
@@ -26,6 +26,7 @@ export const useTransactions = (): UseTransactionsReturn => {
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [loading, setLoading] = useState(true);
     const [budget, setBudget] = useState<number>(0);
+    const isInitialized = useRef(false);
 
     // Load from LocalStorage
     useEffect(() => {
@@ -34,7 +35,10 @@ export const useTransactions = (): UseTransactionsReturn => {
 
         if (savedData) {
             try {
-                setTransactions(JSON.parse(savedData));
+                const parsed = JSON.parse(savedData);
+                if (Array.isArray(parsed)) {
+                    setTransactions(parsed);
+                }
             } catch (e) {
                 console.error("Failed to parse transactions", e);
                 setTransactions([]);
@@ -50,14 +54,15 @@ export const useTransactions = (): UseTransactionsReturn => {
         }
 
         setLoading(false);
+        isInitialized.current = true;
     }, []);
 
     // Save to LocalStorage whenever transactions change
     useEffect(() => {
-        if (!loading) {
+        if (isInitialized.current) {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
         }
-    }, [transactions, loading]);
+    }, [transactions]);
 
     // Save Budget
     const updateBudget = useCallback((newBudget: number) => {
@@ -68,7 +73,7 @@ export const useTransactions = (): UseTransactionsReturn => {
     const addTransaction = useCallback((transaction: Omit<Transaction, 'id'>) => {
         const newTransaction: Transaction = {
             ...transaction,
-            id: crypto.randomUUID(),
+            id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36),
         };
         setTransactions((prev) => [newTransaction, ...prev]);
     }, []);
